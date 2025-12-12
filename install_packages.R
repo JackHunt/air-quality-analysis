@@ -1,0 +1,4 @@
+install.packages(
+  "optparse",
+  "jsonlite"
+)

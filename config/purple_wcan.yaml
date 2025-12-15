@@ -1,0 +1,24 @@
+sensors:
+  - WCAN-105
+  - WCAN-106
+  - WCAN-51
+  - WCAN-9
+  - WCAN-100
+  - WCAN-98
+  - WCAN-48
+  - WCAN-58
+  - WCAN-90
+  - WCAN-14
+  - WCAN-15
+  - WCAN-68
+
+fields:
+  - latitude
+  - longitude
+  - altitude
+  - pm2.5
+  - humidity
+  - temperature
+  - pressure
+
+time_average: 60

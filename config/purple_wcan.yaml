@@ -1,24 +1,33 @@
-sensors:
-  - WCAN-105
-  - WCAN-106
-  - WCAN-51
-  - WCAN-9
-  - WCAN-100
-  - WCAN-98
-  - WCAN-48
-  - WCAN-58
-  - WCAN-90
-  - WCAN-14
-  - WCAN-15
-  - WCAN-68
-
 fields:
-  - latitude
-  - longitude
-  - altitude
-  - pm2.5
   - humidity
-  - temperature
+  - pm2.5_atm
   - pressure
+  - temperature
+  - voc
+sensors:
+  - name: WCAN-105
+    id: 273843
+  - name: WCAN-106
+    id: 270396
+  - name: WCAN-51
+    id: 270280
+  - name: WCAN-9
+    id: 270374
+  - name: WCAN-100
+    id: 272224
+  - name: WCAN-98
+    id: 272190
+  - name: WCAN-48
+    id: 270334
+  - name: WCAN-58
+    id: 272232
+  - name: WCAN-90
+    id: 272260
+  - name: WCAN-14
+    id: 273831
+  - name: WCAN-15
+    id: 270404
+  - name: WCAN-68
+    id: 272214
 
 time_average: 60

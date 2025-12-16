@@ -4,32 +4,30 @@ library(optparse)
 library(yaml)
 
 do_get <- function(id, fields, time_avg, api_key) {
-  fields_str <- head(c(rbind(fields, c("%2C"))), -1)
-  fields_str <- paste(unlist(fields_str), collapse = "")
+  fields_str <- paste(unlist(fields), collapse = ",")
 
   url <- paste0(
-    "https://api.purpleair.com/v1/sensors/:",
+    "https://api.purpleair.com/v1/sensors/",
     id,
-    "/history?",
-    paste0("average=", time_avg, "&"),
-    paste0("fields=", fields_str)
+    "/history"
   )
 
-  req <- request(url) |>
-    req_headers(`X-API-KEY` = api_key)
-
-  req
+  request(url) |>
+    req_url_query(average = time_avg) |>
+    req_url_query(fields = fields_str) |>
+    req_headers(`X-API-Key` = api_key) |>
+    req_perform(verbosity = 3)
 }
 
 retrieve_data <- function(config_path, output_path, api_key) {
   config <- read_yaml(config_path)
 
-  print(do_get("WCAN-105", config$fields, config$time_average, api_key))
-  stop()
-
-  lapply(config$sensors, function(id) {
-    d <- do_get(id, config$fields, config$time_average, api_key)
+  res <- lapply(config$sensors, function(sensor) {
+    d <- do_get(sensor$id, config$fields, config$time_average, api_key)
+    d$sensor <- sensor$name
   })
+
+  saveRDS(res, output_path)
 }
 
 if (!interactive()) {

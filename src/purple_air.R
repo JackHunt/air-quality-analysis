@@ -1,5 +1,5 @@
+library(dplyr)
 library(httr2)
-library(jsonlite)
 library(optparse)
 library(yaml)
 
@@ -9,25 +9,28 @@ do_get <- function(id, fields, time_avg, api_key) {
   url <- paste0(
     "https://api.purpleair.com/v1/sensors/",
     id,
-    "/history"
+    "/history/csv"
   )
 
-  request(url) |>
+  res <- request(url) |>
     req_url_query(average = time_avg) |>
     req_url_query(fields = fields_str) |>
     req_headers(`X-API-Key` = api_key) |>
-    req_perform(verbosity = 3)
+    req_perform(verbosity = 3) |>
+    resp_body_string()
+
+  read.csv(text = res)
 }
 
 retrieve_data <- function(config_path, output_path, api_key) {
   config <- read_yaml(config_path)
 
   res <- lapply(config$sensors, function(sensor) {
-    d <- do_get(sensor$id, config$fields, config$time_average, api_key)
-    d$sensor <- sensor$name
+    do_get(sensor$id, config$fields, config$time_average, api_key)
   })
 
-  saveRDS(res, output_path)
+  res_combined <- bind_rows(res)
+  saveRDS(res_combined, output_path)
 }
 
 if (!interactive()) {
@@ -41,7 +44,8 @@ if (!interactive()) {
       make_option(
         c("-o", "--output_path"),
         type = "character",
-        help = "Path to an outpur RDS file."
+        help = "Path to an outpur RDS file.",
+        default = "./out"
       )
     ),
     description = "PurpleAir Data Retrieval (via the REST API)."

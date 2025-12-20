@@ -1,7 +1,21 @@
 fields:
+  - 0.3_um_count
+  - 0.5_um_count
+  - 1.0_um_count
+  - 2.5_um_count
+  - 5.0_um_count
+  - 10.0_um_count
+  - deciviews
   - humidity
+  - pm1.0_atm
+  - pm1.0_cf_1
+  - pm2.5_alt
   - pm2.5_atm
+  - pm2.5_cf_1
+  - pm10.0_atm
+  - pm10.0_cf_1
   - pressure
+  - scattering_coefficient
   - temperature
   - voc
 sensors:

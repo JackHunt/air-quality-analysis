@@ -48,21 +48,19 @@ do_get_metadata <- function(id, api_key) {
 retrieve_data <- function(config_path, output_path, api_key) {
   config <- read_yaml(config_path)
 
-  res <- lapply(config$sensors, function(sensor) {
+  for (sensor in config$sensors) {
     metadata <- do_get_metadata(sensor$id, api_key)
 
-    do_get(sensor$id, config$fields, config$time_average, api_key) %>%
+    res <- do_get(sensor$id, config$fields, config$time_average, api_key) %>%
       mutate(
         sensor_name = metadata$sensor$name,
         is_indoor = metadata$sensor$location_type,
         latitude = metadata$sensor$latitude,
         longitude = metadata$sensor$longitude
       )
-  })
 
-  res_combined <- bind_rows(res) %>%
-    arrange(sensor_index, time_stamp)
-  saveRDS(res_combined, output_path)
+    saveRDS(res, paste0(output_path, "/", sensor$id, ".rds"))
+  }
 }
 
 if (!interactive()) {
@@ -76,7 +74,7 @@ if (!interactive()) {
       make_option(
         c("-o", "--output_path"),
         type = "character",
-        help = "Path to an outpur RDS file.",
+        help = "Path to an output directory.",
         default = "./out"
       )
     ),

@@ -2,7 +2,7 @@ data {
   int<lower=1> N;
   int<lower=1> D;
 
-  matrix[N, D] X;
+  array[N] vector[D] X;
   vector[N] Y;
 }
 
@@ -18,7 +18,7 @@ parameters {
 
 model {
   matrix[N, N] L_K;
-  matrix[N, N] K = gp_exp_quad_cov(X, alpha, rho);
+  matrix[N, N] K = gp_exp_quad_cov(X, X, alpha, rho);
   real sq_sigma = square(sigma);
 
   for (n in 1 : N) {

@@ -18,7 +18,7 @@ parameters {
 
 model {
   matrix[N, N] L_K;
-  matrix[N, N] K = gp_exp_quad_cov(X, X, alpha, rho);
+  matrix[N, N] K = gp_exp_quad_cov(X, alpha, rho);
   real sq_sigma = square(sigma);
 
   for (n in 1 : N) {

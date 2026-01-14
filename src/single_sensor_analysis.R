@@ -129,4 +129,6 @@ if (!interactive()) {
     fit_args,
     advi = args$advi
   )
+
+  saveRDS(gp, "fit.rds")
 }

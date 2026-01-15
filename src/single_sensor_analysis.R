@@ -1,8 +1,7 @@
 library(dplyr)
 library(optparse)
 library(ggplot2)
-library(rstan)
-options(mc.cores = parallel::detectCores())
+library(GauPro)
 
 load_data <- function(path, sensor_id, prediction_proportion) {
   df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
@@ -14,6 +13,8 @@ load_data <- function(path, sensor_id, prediction_proportion) {
       pm2.5_alt
     ) %>%
     arrange(time_stamp) %>%
+    mutate(time_stamp = time_stamp - min(time_stamp)) %>%
+    mutate(time_stamp = time_stamp / 1000) %>%
     distinct()
 
   n <- nrow(df)
@@ -35,44 +36,19 @@ plot_posterior_mean <- function() {
 
 fit_gp <- function(
   df_fit,
-  df_pred,
-  fit_args,
-  advi = FALSE
+  df_pred
 ) {
-  X <- df_fit %>%
-    select(-pm2.5_alt) %>%
-    as.matrix()
-  
-  Y <- df_fit %>%
-    pull(pm2.5_alt)
+  kernel <- k_Periodic(D = 1) * k_Matern52(D = 1)
+  #kernel <- k_Periodic(D = 4) * k_RatQuad(D = 4)
 
-  model_args <- list(
-    N = nrow(X),
-    D = ncol(X),
-    X = X,
-    Y = Y
+  gp <- gpkm(
+    pm2.5_alt ~ time_stamp,# + temperature + pressure + humidity,
+    df_fit,
+    kernel = kernel,
+    track_optim = TRUE
   )
 
-  model <- stan_model("src/single_sensor_gp.stan")
-
-  if (advi) {
-    vb(
-      model,
-      data = model_args,
-      iter = fit_args$n_iter,
-      seed = fit_args$seed,
-      output_samples = fit_args$n_output_samples,
-      tol_rel_obj = 1e-4
-    )
-  } else {
-    sampling(
-      model,
-      data = model_args,
-      iter = fit_args$n_iter,
-      chains = fit_args$n_chains,
-      seed = fit_args$seed
-    )
-  }
+  gp
 }
 
 if (!interactive()) {
@@ -99,11 +75,7 @@ if (!interactive()) {
         type = "character",
         help = "Path to an output directory.",
         default = "./out"
-      ),
-      make_option(
-        c("-a", "--advi"),
-        action = "store_true",
-        help = "Use variational inference instead of HMC.")
+      )
     ),
     description = "Analyse data for a single sensor."
   )
@@ -116,19 +88,19 @@ if (!interactive()) {
     args$prediction_proportion
   )
 
-  fit_args <- list(
-    n_iter = 1000,
-    seed = 1234,
-    n_output_samples = 1000,
-    n_chains = 4
-  )
-
   gp <- fit_gp(
     df$fit,
-    df$pred,
-    fit_args,
-    advi = args$advi
+    df$pred
   )
 
   saveRDS(gp, "fit.rds")
+
+  print(summary(gp))
+
+  #gp$plot()
+  gp$plot1D()
+
+  out_fit <- gp$pred(gp$X)
+  mu_f <- out_fit$mean
+  var_f <- out_fit$s2
 }

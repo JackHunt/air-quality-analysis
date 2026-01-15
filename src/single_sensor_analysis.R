@@ -30,25 +30,58 @@ plot_raw <- function() {
   stop()
 }
 
-plot_posterior_mean <- function() {
+plot_posterior_mean_var <- function(t) {
   stop()
 }
 
-fit_gp <- function(
-  df_fit,
-  df_pred
-) {
+fit_gp <- function(df_fit) {
   kernel <- k_Periodic(D = 1) * k_Matern52(D = 1)
   #kernel <- k_Periodic(D = 4) * k_RatQuad(D = 4)
 
-  gp <- gpkm(
+  gpkm(
     pm2.5_alt ~ time_stamp,# + temperature + pressure + humidity,
     df_fit,
     kernel = kernel,
     track_optim = TRUE
   )
+}
 
-  gp
+eval_gp <- function(gp, df_fit, df_pred) {
+  get_eval_df <- function(df) {
+    out <- gp$pred(df %>% select(time_stamp))
+
+    df %>%
+      select(time_stamp, pm2.5_alt) %>%
+      mutate(
+        mu_f = out$mean,
+        var_f = out$s2
+      )
+  }
+
+  list(
+    fit = get_eval_df(df_fit),
+    pred = get_eval_df(df_pred)
+  )
+}
+
+analyse_sensor <- function(input_path,
+                           sensor_id,
+                           output_path,
+                           prediction_proportion) {
+  sensor_out_path <- file.path(output_path, sensor_id)
+  dir.create(sensor_out_path)
+
+  data <- load_data(
+    input_path,
+    sensor_id,
+    prediction_proportion
+  )
+
+  gp <- fit_gp(data$fit)
+  saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
+
+  out <- eval_gp(gp, data$fit, data$pred)
+  saveRDS(out, file.path(sensor_out_path, "output.rds"))
 }
 
 if (!interactive()) {
@@ -62,7 +95,8 @@ if (!interactive()) {
       make_option(
         c("-s", "--sensor_id"),
         type = "character",
-        help = "ID of the sensor to analyse."
+        help = "ID of the sensor to analyse.",
+        default = NA
       ),
       make_option(
         c("-p", "--prediction_proportion"),
@@ -82,25 +116,36 @@ if (!interactive()) {
 
   args <- parse_args(opt_parser)
 
-  df <- load_data(
-    args$input_path,
-    args$sensor_id,
-    args$prediction_proportion
-  )
+  dir.create(args$output_path)
 
-  gp <- fit_gp(
-    df$fit,
-    df$pred
-  )
+  if (is.na(args$sensor_id)) {
+    sensor_ids <- lapply(
+      list.files(pattern = "\\.rds$", ignore.case = TRUE),
+      function(fname) {
+        sub("\\.rds$", "", fname)
+      }
+    )
+  } else {
+    sensor_ids <- c(args$sensor_id)
+  }
 
-  saveRDS(gp, "fit.rds")
+  for (id in sensor_ids) {
+    analyse_sensor(
+      args$input_path,
+      id,
+      args$output_path,
+      args$prediction_proportion
+    )
+  }
 
-  print(summary(gp))
+  #saveRDS(gp, "fit.rds")
+
+  #print(summary(gp))
 
   #gp$plot()
-  gp$plot1D()
+  #gp$plot1D()
 
-  out_fit <- gp$pred(gp$X)
-  mu_f <- out_fit$mean
-  var_f <- out_fit$s2
+  #out_fit <- gp$pred(gp$X)
+  #mu_f <- out_fit$mean
+  #var_f <- out_fit$s2
 }

@@ -26,8 +26,9 @@ load_data <- function(path, sensor_id, prediction_proportion) {
   )
 }
 
-plot_raw <- function() {
-  stop()
+plot_raw <- function(df) {
+  ggplot(df, aes(time_stamp, pm2.5_alt)) +
+    geom_point()
 }
 
 plot_posterior_mean_var <- function(t) {
@@ -48,13 +49,17 @@ fit_gp <- function(df_fit) {
 
 eval_gp <- function(gp, df_fit, df_pred) {
   get_eval_df <- function(df) {
-    out <- gp$pred(df %>% select(time_stamp))
+    out <- gp$pred(
+      df %>% select(time_stamp),
+      se.fit = TRUE
+    )
 
     df %>%
       select(time_stamp, pm2.5_alt) %>%
       mutate(
         mu_f = out$mean,
-        var_f = out$s2
+        var_f = out$s2,
+        se_f = out$se
       )
   }
 
@@ -137,15 +142,4 @@ if (!interactive()) {
       args$prediction_proportion
     )
   }
-
-  #saveRDS(gp, "fit.rds")
-
-  #print(summary(gp))
-
-  #gp$plot()
-  #gp$plot1D()
-
-  #out_fit <- gp$pred(gp$X)
-  #mu_f <- out_fit$mean
-  #var_f <- out_fit$s2
 }

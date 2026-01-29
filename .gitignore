@@ -50,3 +50,4 @@ rsconnect/
 keys.yaml
 .DS_Store
 /out
+fit.rds

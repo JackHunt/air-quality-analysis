@@ -1,15 +1,15 @@
 library(optparse)
 library(shiny)
+library(bslib)
 
 run_shiny <- function(args) {
-  ui <- page_fluid(
-    titlePanel("Air Quality"),
-    layout_columns(
-      col_width = 2,
-      card(
-        card_header("Date range input"),
-        dateRangeInput("dates", "Select dates")
+  ui <- pageWithSidebar(
+    headerPanel("Air Quality"),
+    sidebarPanel(
+      dateRangeInput("dates", "Select dates")
     ),
+    mainPanel(
+      #
     )
   )
 

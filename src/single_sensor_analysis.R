@@ -1,8 +1,7 @@
 library(dplyr)
 library(optparse)
 library(ggplot2)
-library(rstan)
-options(mc.cores = parallel::detectCores())
+library(GauPro)
 
 load_data <- function(path, sensor_id, prediction_proportion) {
   df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
@@ -14,6 +13,8 @@ load_data <- function(path, sensor_id, prediction_proportion) {
       pm2.5_alt
     ) %>%
     arrange(time_stamp) %>%
+    mutate(time_stamp = time_stamp - min(time_stamp)) %>%
+    mutate(time_stamp = time_stamp / 1000) %>%
     distinct()
 
   n <- nrow(df)
@@ -25,54 +26,67 @@ load_data <- function(path, sensor_id, prediction_proportion) {
   )
 }
 
-plot_raw <- function() {
+plot_raw <- function(df) {
+  ggplot(df, aes(time_stamp, pm2.5_alt)) +
+    geom_point()
+}
+
+plot_posterior_mean_var <- function(t) {
   stop()
 }
 
-plot_posterior_mean <- function() {
-  stop()
+fit_gp <- function(df_fit) {
+  kernel <- k_Periodic(D = 1) * k_Matern52(D = 1)
+  #kernel <- k_Periodic(D = 4) * k_RatQuad(D = 4)
+
+  gpkm(
+    pm2.5_alt ~ time_stamp,# + temperature + pressure + humidity,
+    df_fit,
+    kernel = kernel,
+    track_optim = TRUE
+  )
 }
 
-fit_gp <- function(
-  df_fit,
-  df_pred,
-  fit_args,
-  advi = FALSE
-) {
-  X <- df_fit %>%
-    select(-pm2.5_alt) %>%
-    as.matrix()
-  
-  Y <- df_fit %>%
-    pull(pm2.5_alt)
+eval_gp <- function(gp, df_fit, df_pred) {
+  get_eval_df <- function(df) {
+    out <- gp$pred(
+      df %>% select(time_stamp),
+      se.fit = TRUE
+    )
 
-  model_args <- list(
-    N = nrow(X),
-    D = ncol(X),
-    X = X,
-    Y = Y
+    df %>%
+      select(time_stamp, pm2.5_alt) %>%
+      mutate(
+        mu_f = out$mean,
+        var_f = out$s2,
+        se_f = out$se
+      )
+  }
+
+  list(
+    fit = get_eval_df(df_fit),
+    pred = get_eval_df(df_pred)
+  )
+}
+
+analyse_sensor <- function(input_path,
+                           sensor_id,
+                           output_path,
+                           prediction_proportion) {
+  sensor_out_path <- file.path(output_path, sensor_id)
+  dir.create(sensor_out_path)
+
+  data <- load_data(
+    input_path,
+    sensor_id,
+    prediction_proportion
   )
 
-  model <- stan_model("src/single_sensor_gp.stan")
+  gp <- fit_gp(data$fit)
+  saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
 
-  if (advi) {
-    vb(
-      model,
-      data = model_args,
-      iter = fit_args$n_iter,
-      seed = fit_args$seed,
-      output_samples = fit_args$n_output_samples,
-      tol_rel_obj = 1e-4
-    )
-  } else {
-    sampling(
-      model,
-      data = model_args,
-      iter = fit_args$n_iter,
-      chains = fit_args$n_chains,
-      seed = fit_args$seed
-    )
-  }
+  out <- eval_gp(gp, data$fit, data$pred)
+  saveRDS(out, file.path(sensor_out_path, "output.rds"))
 }
 
 if (!interactive()) {
@@ -86,7 +100,8 @@ if (!interactive()) {
       make_option(
         c("-s", "--sensor_id"),
         type = "character",
-        help = "ID of the sensor to analyse."
+        help = "ID of the sensor to analyse.",
+        default = NA
       ),
       make_option(
         c("-p", "--prediction_proportion"),
@@ -99,36 +114,32 @@ if (!interactive()) {
         type = "character",
         help = "Path to an output directory.",
         default = "./out"
-      ),
-      make_option(
-        c("-a", "--advi"),
-        action = "store_true",
-        help = "Use variational inference instead of HMC.")
+      )
     ),
     description = "Analyse data for a single sensor."
   )
 
   args <- parse_args(opt_parser)
 
-  df <- load_data(
-    args$input_path,
-    args$sensor_id,
-    args$prediction_proportion
-  )
+  dir.create(args$output_path)
 
-  fit_args <- list(
-    n_iter = 1000,
-    seed = 1234,
-    n_output_samples = 1000,
-    n_chains = 4
-  )
+  if (is.na(args$sensor_id)) {
+    sensor_ids <- lapply(
+      list.files(pattern = "\\.rds$", ignore.case = TRUE),
+      function(fname) {
+        sub("\\.rds$", "", fname)
+      }
+    )
+  } else {
+    sensor_ids <- c(args$sensor_id)
+  }
 
-  gp <- fit_gp(
-    df$fit,
-    df$pred,
-    fit_args,
-    advi = args$advi
-  )
-
-  saveRDS(gp, "fit.rds")
+  for (id in sensor_ids) {
+    analyse_sensor(
+      args$input_path,
+      id,
+      args$output_path,
+      args$prediction_proportion
+    )
+  }
 }

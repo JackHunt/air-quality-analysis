@@ -49,3 +49,6 @@ po/*~
 rsconnect/
 keys.yaml
 .DS_Store
+/out
+fit.rds
+Rplots.pdf

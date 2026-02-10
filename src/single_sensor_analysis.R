@@ -1,6 +1,5 @@
 library(dplyr)
 library(optparse)
-library(ggplot2)
 library(GauPro)
 
 load_data <- function(path, sensor_id, prediction_proportion) {
@@ -26,21 +25,12 @@ load_data <- function(path, sensor_id, prediction_proportion) {
   )
 }
 
-plot_raw <- function(df) {
-  ggplot(df, aes(time_stamp, pm2.5_alt)) +
-    geom_point()
-}
-
-plot_posterior_mean_var <- function(t) {
-  stop()
-}
-
 fit_gp <- function(df_fit) {
-  kernel <- k_Periodic(D = 1) * k_Matern52(D = 1)
-  #kernel <- k_Periodic(D = 4) * k_RatQuad(D = 4)
+  #kernel <- k_Periodic(D = 1) * k_Matern52(D = 1)
+  kernel <- k_Periodic(D = 4) * k_RatQuad(D = 4)
 
   gpkm(
-    pm2.5_alt ~ time_stamp,# + temperature + pressure + humidity,
+    pm2.5_alt ~ time_stamp + temperature + pressure + humidity,
     df_fit,
     kernel = kernel,
     track_optim = TRUE
@@ -50,12 +40,12 @@ fit_gp <- function(df_fit) {
 eval_gp <- function(gp, df_fit, df_pred) {
   get_eval_df <- function(df) {
     out <- gp$pred(
-      df %>% select(time_stamp),
+      df %>% select(time_stamp, temperature, pressure, humidity),
       se.fit = TRUE
     )
 
     df %>%
-      select(time_stamp, pm2.5_alt) %>%
+      select(time_stamp, temperature, pressure, humidity, pm2.5_alt) %>%
       mutate(
         mu_f = out$mean,
         var_f = out$s2,

@@ -1,6 +1,6 @@
 library(dplyr)
 library(optparse)
-library(GauPro)
+library(gplite)
 
 load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
   df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
@@ -12,8 +12,11 @@ load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
       pm2.5_alt
     ) %>%
     arrange(time_stamp) %>%
-    mutate(time_stamp = time_stamp - min(time_stamp)) %>%
-    mutate(time_stamp = time_stamp / 1000) %>%
+    mutate(
+      original_time_stamp = time_stamp,
+      date = as.Date(as.POSIXct(time_stamp, origin = "1970-01-01"))
+    ) %>%
+    mutate(time_stamp = (time_stamp - min(time_stamp)) / 1000) %>%
     distinct()
 
   if (drop_proportion > 0.0) {
@@ -32,30 +35,42 @@ load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
 }
 
 fit_gp <- function(df_fit) {
-  #kernel <- k_Periodic(D = 1) * k_Matern52(D = 1)
-  kernel <- k_Periodic(D = 4) * k_RatQuad(D = 4)
-
-  gpkm(
-    pm2.5_alt ~ time_stamp + temperature + pressure + humidity,
-    df_fit,
-    kernel = kernel,
-    track_optim = TRUE
+  kernels <- list(
+    cf_periodic(),
+    cf_matern52(),
+    cf_lin() * cf_periodic()
   )
+
+  gp <- gp_init(
+    cfs = kernels,
+    lik = lik_gaussian()
+  )
+
+  gp <- gp_optim(
+    gp,
+    df_fit$time_stamp,
+    df_fit$pm2.5_alt,
+    max_iter = 5000,
+    restarts = 5,
+    verbose = FALSE
+  )
+
+  gp
 }
 
 eval_gp <- function(gp, df_fit, df_pred) {
   get_eval_df <- function(df) {
-    out <- gp$pred(
-      df %>% select(time_stamp, temperature, pressure, humidity),
-      se.fit = TRUE
+    out <- gp_pred(
+      gp,
+      df$time_stamp,
+      var = TRUE
     )
 
     df %>%
-      select(time_stamp, temperature, pressure, humidity, pm2.5_alt) %>%
+      select(date, temperature, pressure, humidity, pm2.5_alt) %>%
       mutate(
         mu_f = out$mean,
-        var_f = out$s2,
-        se_f = out$se
+        var_f = out$var,
       )
   }
 

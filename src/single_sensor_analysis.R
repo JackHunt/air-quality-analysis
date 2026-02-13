@@ -2,7 +2,7 @@ library(dplyr)
 library(optparse)
 library(GauPro)
 
-load_data <- function(path, sensor_id, prediction_proportion) {
+load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
   df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
     select(
       time_stamp,
@@ -15,6 +15,12 @@ load_data <- function(path, sensor_id, prediction_proportion) {
     mutate(time_stamp = time_stamp - min(time_stamp)) %>%
     mutate(time_stamp = time_stamp / 1000) %>%
     distinct()
+
+  if (drop_proportion > 0.0) {
+    n <- nrow(df)
+    n_drop <- floor(n * drop_proportion)
+    df <- df %>% slice(n_drop : n)
+  }
 
   n <- nrow(df)
   n_fit <- floor(n * (1.0 - prediction_proportion))
@@ -62,14 +68,16 @@ eval_gp <- function(gp, df_fit, df_pred) {
 analyse_sensor <- function(input_path,
                            sensor_id,
                            output_path,
-                           prediction_proportion) {
+                           prediction_proportion,
+                           drop_proportion) {
   sensor_out_path <- file.path(output_path, sensor_id)
   dir.create(sensor_out_path)
 
   data <- load_data(
     input_path,
     sensor_id,
-    prediction_proportion
+    prediction_proportion,
+    drop_proportion
   )
 
   gp <- fit_gp(data$fit)
@@ -98,6 +106,12 @@ if (!interactive()) {
         type = "double",
         default = 0.1,
         help = "Proportion of last measurements to predict on (e.g. 0.1 predicts on last 10%)."
+      ),
+      make_option(
+        c("-d", "--drop_proportion"),
+        type = "double",
+        default = 0.0,
+        help = "Proportion of the dataset to skip (prior to splitting)."
       ),
       make_option(
         c("-o", "--output_path"),
@@ -129,7 +143,8 @@ if (!interactive()) {
       args$input_path,
       id,
       args$output_path,
-      args$prediction_proportion
+      args$prediction_proportion,
+      args$drop_proportion
     )
   }
 }

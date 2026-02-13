@@ -12,19 +12,19 @@ plot_raw <- function(df) {
   }
 
   p1 <- plot_ts(
-    "time_stamp",
+    "date",
     "temperature",
     "Temperature"
   )
 
   p2 <- plot_ts(
-    "time_stamp",
+    "date",
     "pressure",
     "Pressure"
   )
 
   p3 <- plot_ts(
-    "time_stamp",
+    "date",
     "humidity",
     "Humidity"
   )
@@ -33,12 +33,12 @@ plot_raw <- function(df) {
 }
 
 plot_posterior_mean <- function(df) {
-  ggplot(df, aes(x = time_stamp)) +
+  ggplot(df, aes(x = date)) +
     geom_line(aes(y = mu_f, color = "Posterior Mean")) +
     geom_ribbon(
       aes(
-        ymin = mu_f - sqrt(var_f),
-        ymax = mu_f + sqrt(var_f)
+        ymin = mu_f - 2 * sqrt(var_f),
+        ymax = mu_f + 2 * sqrt(var_f)
       ),
       alpha = 0.1
     ) +

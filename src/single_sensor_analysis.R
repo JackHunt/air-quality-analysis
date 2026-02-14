@@ -14,7 +14,7 @@ load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
     arrange(time_stamp) %>%
     mutate(
       original_time_stamp = time_stamp,
-      date = as.Date(as.POSIXct(time_stamp, origin = "1970-01-01"))
+      date = as.POSIXct(time_stamp, origin = "1970-01-01", tz = "GMT")
     ) %>%
     mutate(time_stamp = (time_stamp - min(time_stamp)) / 1000) %>%
     distinct()

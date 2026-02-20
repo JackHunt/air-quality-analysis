@@ -1,6 +1,9 @@
 library(dplyr)
-library(optparse)
 library(gplite)
+library(optparse)
+library(tsgarch)
+library(xts)
+
 
 load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
   df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
@@ -80,6 +83,21 @@ eval_gp <- function(gp, df_fit, df_pred) {
   )
 }
 
+fit_garch <- function(df_fit) {
+  spec <- garch_modelspec(
+    xts(
+      df_fit$pm2.5_alt,
+      order.by = df_fit$date
+    ),
+    model = 'fgarch',
+    constant = TRUE,
+    init = 'unconditional',
+    distribution = 'jsu'
+  )
+
+  estimate(spec)
+}
+
 analyse_sensor <- function(input_path,
                            sensor_id,
                            output_path,
@@ -100,6 +118,9 @@ analyse_sensor <- function(input_path,
 
   out <- eval_gp(gp, data$fit, data$pred)
   saveRDS(out, file.path(sensor_out_path, "output.rds"))
+
+  garch <- fit_garch(data$fit)
+  saveRDS(garch, file.path(sensor_out_path, "garch.rds"))
 }
 
 if (!interactive()) {

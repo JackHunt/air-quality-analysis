@@ -3,6 +3,7 @@ library(shiny)
 library(bslib)
 library(ggplot2)
 library(patchwork)
+library(tsgarch)
 
 plot_raw <- function(df) {
   plot_ts <- function(x, y, title) {
@@ -51,15 +52,31 @@ run_shiny <- function(args) {
   df_pred <- output$pred
   df_fit <- output$fit
 
-  ui <- pageWithSidebar(
+  garch <- readRDS(file.path(args$input_path, "garch.rds"))
+
+  ui <- page_fillable(
     headerPanel("Air Quality"),
-    sidebarPanel(
-      dateRangeInput("dates", "Select dates")
-    ),
-    mainPanel(
-      plotOutput("raw_plot"),
-      plotOutput("pred_plot"),
-      plotOutput("fit_plot"),
+    navset_card_tab(
+      nav_panel(
+        "Raw Data",
+        mainPanel(
+          plotOutput("raw_plot"),
+        )
+      ),
+      nav_panel(
+        "GP",
+        mainPanel(
+          plotOutput("fit_plot"),
+          plotOutput("pred_plot"),
+        )
+      ),
+      nav_panel(
+        "GARCH",
+        mainPanel(
+          plotOutput("garch_plot"),
+          tableOutput("garch_table")
+        )
+      )
     )
   )
 
@@ -67,6 +84,8 @@ run_shiny <- function(args) {
     output$raw_plot <- renderPlot(plot_raw(df_pred))
     output$pred_plot <- renderPlot(plot_posterior_mean(df_pred))
     output$fit_plot <- renderPlot(plot_posterior_mean(df_fit))
+    output$garch_plot <- renderPlot(plot(garch))
+    output$garch_table <- renderTable(as_flextable(summary(garch)))
   }
 
   shinyApp(ui = ui, server = server)

@@ -99,13 +99,16 @@ fit_arma <- function(df, fit_args) {
   )
 }
 
-fit_ar_p <- function(df, p, fit_args) {
-  y <- df$log_pm2.5_alt
+fit_ar_p <- function(df_fit, df_pred, p, fit_args) {
+  y <- df_fit$log_pm2.5_alt
+  y_test <- df_pred$log_pm2.5_alt
 
   model_args <- list(
     p = p,
     N = length(y),
-    y = y
+    N_test = length(y_test),
+    y = y,
+    y_test = y_test
   )
 
   model <- cmdstan_model("src/ar_p.stan")
@@ -118,20 +121,22 @@ fit_ar_p <- function(df, p, fit_args) {
   )
 
   print(dimnames(fit$draws()))
-
-  out_df <- df %>%
-    select(
-      date,
-      time_stamp,
-      log_pm2.5_alt
-    ) %>%
-    mutate(
-      pred = NULL
-    )
+  get_out_df <- function(df, y_samples) {
+    df %>%
+      select(
+        date,
+        time_stamp,
+        log_pm2.5_alt
+      ) %>%
+      mutate(
+        pred = y_samples
+      )
+  }
 
   list(
-    fit = fit,
-    df = out_df,
+    model_fit = fit,
+    df_fit = get_out_df(df_fit, NULL),
+    df_pred = get_out_df(df_pred, NULL),
     p = p
   )
 }
@@ -159,12 +164,8 @@ analyse_sensor <- function(input_path,
   #saveRDS(arma, file.path(sensor_out_path, "arma.rds"))
 
   p <- 12
-  ar_p <- fit_ar_p(data$fit, p, stan_fit_args)
-  saveRDS(
-    ar_p,
-    p,
-    file.path(sensor_out_path, "ar_p.rds")
-  )
+  ar_p <- fit_ar_p(data$fit, data$pred, p, stan_fit_args)
+  saveRDS(ar_p, file.path(sensor_out_path, "ar_p.rds"))
 }
 
 if (!interactive()) {

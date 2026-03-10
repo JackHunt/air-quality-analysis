@@ -1,9 +1,7 @@
+library(cmdstanr)
 library(dplyr)
 library(gplite)
 library(optparse)
-library(tsgarch)
-library(xts)
-
 
 load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
   df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
@@ -17,7 +15,8 @@ load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
     arrange(time_stamp) %>%
     mutate(
       original_time_stamp = time_stamp,
-      date = as.POSIXct(time_stamp, origin = "1970-01-01", tz = "GMT")
+      date = as.POSIXct(time_stamp, origin = "1970-01-01", tz = "GMT"),
+      log_pm2.5_alt = log(pm2.5_alt)
     ) %>%
     mutate(time_stamp = (time_stamp - min(time_stamp)) / 1000) %>%
     distinct()
@@ -37,7 +36,7 @@ load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
   )
 }
 
-fit_gp <- function(df_fit) {
+fit_gp <- function(df_fit, df_pred) {
   kernels <- list(
     cf_periodic(),
     cf_matern52(),
@@ -52,16 +51,12 @@ fit_gp <- function(df_fit) {
   gp <- gp_optim(
     gp,
     df_fit$time_stamp,
-    df_fit$pm2.5_alt,
+    df_fit$log_pm2.5_alt,
     max_iter = 5000,
     restarts = 5,
     verbose = FALSE
   )
 
-  gp
-}
-
-eval_gp <- function(gp, df_fit, df_pred) {
   get_eval_df <- function(df) {
     out <- gp_pred(
       gp,
@@ -70,7 +65,11 @@ eval_gp <- function(gp, df_fit, df_pred) {
     )
 
     df %>%
-      select(date, temperature, pressure, humidity, pm2.5_alt) %>%
+      select(
+        date,
+        time_stamp,
+        log_pm2.5_alt
+      ) %>%
       mutate(
         mu_f = out$mean,
         var_f = out$var,
@@ -79,30 +78,70 @@ eval_gp <- function(gp, df_fit, df_pred) {
 
   list(
     fit = get_eval_df(df_fit),
-    pred = get_eval_df(df_pred)
+    pred = get_eval_df(df_pred),
+    model = gp
   )
 }
 
-fit_garch <- function(df_fit) {
-  spec <- garch_modelspec(
-    xts(
-      df_fit$pm2.5_alt,
-      order.by = df_fit$date
-    ),
-    model = 'fgarch',
-    constant = TRUE,
-    init = 'unconditional',
-    distribution = 'jsu'
+fit_arma <- function(df, fit_args) {
+  model_args <- list(
+    a=NULL
   )
 
-  estimate(spec)
+  model <- stan_model("arma.stan")
+
+  fit <- sampling(
+    model,
+    data = model_args,
+    iter = fit_args$n_iter,
+    chains = fit_args$n_chains,
+    seed = fit_args$seed
+  )
+}
+
+fit_ar_p <- function(df, p, fit_args) {
+  y <- df$log_pm2.5_alt
+
+  model_args <- list(
+    p = p,
+    N = length(y),
+    y = y
+  )
+
+  model <- cmdstan_model("src/ar_p.stan")
+
+  fit <- model$sample(
+    data = model_args,
+    chains = fit_args$n_chains,
+    parallel_chains = fit_args$n_chains,
+    seed = fit_args$seed
+  )
+
+  print(dimnames(fit$draws()))
+
+  out_df <- df %>%
+    select(
+      date,
+      time_stamp,
+      log_pm2.5_alt
+    ) %>%
+    mutate(
+      pred = NULL
+    )
+
+  list(
+    fit = fit,
+    df = out_df,
+    p = p
+  )
 }
 
 analyse_sensor <- function(input_path,
                            sensor_id,
                            output_path,
                            prediction_proportion,
-                           drop_proportion) {
+                           drop_proportion,
+                           stan_fit_args) {
   sensor_out_path <- file.path(output_path, sensor_id)
   dir.create(sensor_out_path)
 
@@ -113,14 +152,19 @@ analyse_sensor <- function(input_path,
     drop_proportion
   )
 
-  gp <- fit_gp(data$fit)
-  saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
+  #gp <- fit_gp(data$fit)
+  #saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
 
-  out <- eval_gp(gp, data$fit, data$pred)
-  saveRDS(out, file.path(sensor_out_path, "output.rds"))
+  #arma <- fit_arma(data$fit)
+  #saveRDS(arma, file.path(sensor_out_path, "arma.rds"))
 
-  garch <- fit_garch(data$fit)
-  saveRDS(garch, file.path(sensor_out_path, "garch.rds"))
+  p <- 12
+  ar_p <- fit_ar_p(data$fit, p, stan_fit_args)
+  saveRDS(
+    ar_p,
+    p,
+    file.path(sensor_out_path, "ar_p.rds")
+  )
 }
 
 if (!interactive()) {
@@ -174,13 +218,20 @@ if (!interactive()) {
     sensor_ids <- c(args$sensor_id)
   }
 
+  stan_fit_args <- list(
+    n_iter = 2000,
+    n_chains = 4,
+    seed = 7573
+  )
+
   for (id in sensor_ids) {
     analyse_sensor(
       args$input_path,
       id,
       args$output_path,
       args$prediction_proportion,
-      args$drop_proportion
+      args$drop_proportion,
+      stan_fit_args
     )
   }
 }

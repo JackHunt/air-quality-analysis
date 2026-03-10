@@ -2,9 +2,7 @@
 Air quality analysis.
 
 ## Setup
-```shell
-conda env create -f env.yaml
-conda activate air-quality-analysis
-
-Rscript install_extra.R
+Then install packages; in an R session run
+```R
+source("install_packages.R")
 ```

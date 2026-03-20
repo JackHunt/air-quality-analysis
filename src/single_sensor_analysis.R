@@ -85,7 +85,7 @@ fit_gp <- function(df_fit, df_pred) {
 
 fit_arma <- function(df, fit_args) {
   model_args <- list(
-    a=NULL
+    a = NULL
   )
 
   model <- stan_model("arma.stan")
@@ -97,6 +97,15 @@ fit_arma <- function(df, fit_args) {
     chains = fit_args$n_chains,
     seed = fit_args$seed
   )
+}
+
+posterior_mean_std <- function(stan_fit, var_pattern) {
+  col_names <- stan_fit$metadata()$model_params
+  col_names <- col_names[grepl(var_pattern, col_names)]
+
+  stan_fit$summary(variables = col_names, mean, sd)
+
+  #as.data.frame(samples)
 }
 
 fit_ar_p <- function(df_fit, df_pred, p, fit_args) {
@@ -120,8 +129,7 @@ fit_ar_p <- function(df_fit, df_pred, p, fit_args) {
     seed = fit_args$seed
   )
 
-  print(dimnames(fit$draws()))
-  get_out_df <- function(df, y_samples) {
+  get_out_df <- function(df, posterior_df) {
     df %>%
       select(
         date,
@@ -129,14 +137,18 @@ fit_ar_p <- function(df_fit, df_pred, p, fit_args) {
         log_pm2.5_alt
       ) %>%
       mutate(
-        pred = y_samples
+        mu = posterior_df$mean,
+        sigma = posterior_df$sd
       )
   }
 
+  fit_posterior <- posterior_mean_std(fit, "y_pred")
+  pred_posterior <- posterior_mean_std(fit, "y_test_pred")
+
   list(
     model_fit = fit,
-    df_fit = get_out_df(df_fit, NULL),
-    df_pred = get_out_df(df_pred, NULL),
+    df_fit = get_out_df(df_fit, fit_posterior),
+    df_pred = get_out_df(df_pred, pred_posterior),
     p = p
   )
 }
@@ -163,7 +175,7 @@ analyse_sensor <- function(input_path,
   #arma <- fit_arma(data$fit)
   #saveRDS(arma, file.path(sensor_out_path, "arma.rds"))
 
-  p <- 12
+  p <- 4
   ar_p <- fit_ar_p(data$fit, data$pred, p, stan_fit_args)
   saveRDS(ar_p, file.path(sensor_out_path, "ar_p.rds"))
 }

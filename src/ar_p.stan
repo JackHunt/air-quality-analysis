@@ -1,5 +1,6 @@
 data {
   int<lower=1> p;
+  int<lower=1> n;
   int<lower=1> N;
   int<lower=1> N_test;
 
@@ -10,7 +11,7 @@ data {
 parameters {
   real alpha;
   array[p] real beta;
-  real<lower=0.00001> sigma;
+  real<lower=0.001> sigma;
 }
 
 model {
@@ -18,14 +19,14 @@ model {
   beta ~ normal(0, 1);
   sigma ~ normal(0, 1);
 
-  for (n in (p + 1) : N) {
+  for (j in (p + 1) : N) {
     real mu = alpha;
 
     for (k in 1 : p) {
-      mu += beta[k] * y[n - k];
+      mu += beta[k] * y[j - k];
     }
 
-    y[n] ~ normal(mu, sigma);
+    y[j] ~ normal(mu, sigma);
   }
 }
 
@@ -40,12 +41,22 @@ generated quantities {
   y_pred = rep_array(0.0, N);
   y_test_pred = rep_array(0.0, N_test);
 
-  for (n in (p + 1) : N) {
-    for (k in 1 : p) {
-      y_pred[n] += beta[k] * y[n - k];
+  for (i in 1 : p) {
+    y_pred[i] = y[i];
+    y_test_pred[i] = y_test[i];
+  }
 
-      if (n <= N_test) {
-        y_test_pred[n] += beta[k] * y_test[n - k];
+  for (j in (p + 1) : N) {
+    for (k in 1 : p) {
+
+      y_pred[j] += beta[k] * y[j - k];
+
+      if (j <= N_test) {
+        if (k < (p - n)) {
+          y_test_pred[j] += beta[k] * y_test[j - k];
+        } else {
+          y_test_pred[j] += beta[k] * y_test_pred[j - k];
+        }
       }
     }
   }

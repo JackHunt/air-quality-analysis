@@ -38,9 +38,8 @@ load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
 
 fit_gp <- function(df_fit, df_pred) {
   kernels <- list(
-    cf_periodic(),
-    cf_matern52(),
-    cf_lin() * cf_periodic()
+    cf_periodic() * cf_matern52()#,
+    #cf_lin() * cf_periodic()
   )
 
   gp <- gp_init(
@@ -53,8 +52,7 @@ fit_gp <- function(df_fit, df_pred) {
     df_fit$time_stamp,
     df_fit$log_pm2.5_alt,
     max_iter = 5000,
-    restarts = 5,
-    verbose = FALSE
+    restarts = 5
   )
 
   get_eval_df <- function(df) {
@@ -68,11 +66,11 @@ fit_gp <- function(df_fit, df_pred) {
       select(
         date,
         time_stamp,
-        log_pm2.5_alt
+        pm2.5_alt
       ) %>%
       mutate(
-        mu_f = out$mean,
-        var_f = out$var,
+        mu = exp(out$mean),
+        sigma = exp(out$var)
       )
   }
 
@@ -83,37 +81,36 @@ fit_gp <- function(df_fit, df_pred) {
   )
 }
 
-fit_arma <- function(df, fit_args) {
-  model_args <- list(
-    a = NULL
-  )
-
-  model <- stan_model("arma.stan")
-
-  fit <- sampling(
-    model,
-    data = model_args,
-    iter = fit_args$n_iter,
-    chains = fit_args$n_chains,
-    seed = fit_args$seed
-  )
-}
-
-posterior_mean_std <- function(stan_fit, var_pattern) {
+posterior_eval <- function(stan_fit, y_true, var_pattern) {
   col_names <- stan_fit$metadata()$model_params
   col_names <- col_names[grepl(var_pattern, col_names)]
 
-  stan_fit$summary(variables = col_names, mean, sd)
+  summary <- stan_fit$summary(variables = col_names, mean, sd)
 
-  #as.data.frame(samples)
+  draws <- stan_fit$draws(col_names, format = "matrix")
+
+  rss <- apply(draws, 1, function(y_sample) {
+    sum((y_true - y_sample)^2)
+  })
+
+  r_sq <- 1 - (rss / (length(y_true) * var(y_true)))
+
+  list(
+    summary = summary,
+    metrics = list(
+      rss = rss,
+      r_sq = r_sq
+    )
+  )
 }
 
-fit_ar_p <- function(df_fit, df_pred, p, fit_args) {
+fit_ar_p <- function(df_fit, df_pred, p, n, fit_args) {
   y <- df_fit$log_pm2.5_alt
   y_test <- df_pred$log_pm2.5_alt
 
   model_args <- list(
     p = p,
+    n = n,
     N = length(y),
     N_test = length(y_test),
     y = y,
@@ -134,22 +131,26 @@ fit_ar_p <- function(df_fit, df_pred, p, fit_args) {
       select(
         date,
         time_stamp,
-        log_pm2.5_alt
+        pm2.5_alt
       ) %>%
       mutate(
-        mu = posterior_df$mean,
-        sigma = posterior_df$sd
+        mu = exp(posterior_df$summary$mean),
+        sigma = exp(posterior_df$summary$sd)
       )
   }
 
-  fit_posterior <- posterior_mean_std(fit, "y_pred")
-  pred_posterior <- posterior_mean_std(fit, "y_test_pred")
+  fit_posterior <- posterior_eval(fit, y, "y_pred")
+  pred_posterior <- posterior_eval(fit, y_test, "y_test_pred")
 
   list(
     model_fit = fit,
-    df_fit = get_out_df(df_fit, fit_posterior),
-    df_pred = get_out_df(df_pred, pred_posterior),
-    p = p
+    res = list(
+      df_fit = get_out_df(df_fit, fit_posterior),
+      eval_fit = fit_posterior$metrics,
+      df_pred = get_out_df(df_pred, pred_posterior),
+      eval_pred = pred_posterior$metrics,
+      p = p
+    )
   )
 }
 
@@ -169,15 +170,14 @@ analyse_sensor <- function(input_path,
     drop_proportion
   )
 
-  #gp <- fit_gp(data$fit)
-  #saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
+  gp <- fit_gp(data$fit, data$pred)
+  saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
 
-  #arma <- fit_arma(data$fit)
-  #saveRDS(arma, file.path(sensor_out_path, "arma.rds"))
-
-  p <- 4
-  ar_p <- fit_ar_p(data$fit, data$pred, p, stan_fit_args)
-  saveRDS(ar_p, file.path(sensor_out_path, "ar_p.rds"))
+  p <- 12
+  n <- 10
+  ar_p <- fit_ar_p(data$fit, data$pred, p, n, stan_fit_args)
+  saveRDS(ar_p$res, file.path(sensor_out_path, "ar_p.rds"))
+  ar_p$model_fit$save_object(file.path(sensor_out_path, "ar_p_stan.rds"))
 }
 
 if (!interactive()) {

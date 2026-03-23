@@ -3,40 +3,52 @@ library(shiny)
 library(bslib)
 library(ggplot2)
 
-plot_gp <- function(input, output, gp) {
-  plot_posterior_mean <- function(df) {
-    ggplot(df, aes(x = date)) +
-      geom_line(aes(y = mu_f, color = "Posterior Mean")) +
-      geom_ribbon(
-        aes(
-          ymin = mu_f - 2 * sqrt(var_f),
-          ymax = mu_f + 2 * sqrt(var_f)
-        ),
-        alpha = 0.1
-      ) +
-      geom_line(aes(y = log_pm2.5_alt, color = "True PM2.5")) +
-      ggtitle("PM2.5 Prediction")
+plot_posterior_mean <- function(df, split_date = NULL) {
+  p <- ggplot(df, aes(x = date)) +
+    geom_line(aes(y = pm2.5_alt, color = "True PM2.5")) +
+    geom_line(aes(y = mu, color = "Posterior Mean PM2.5")) +
+    geom_ribbon(
+      aes(
+        ymin = mu - 2 * sqrt(sigma),
+        ymax = mu + 2 * sqrt(sigma)
+      ),
+      alpha = 0.25
+    ) +
+    ggtitle("PM2.5 Prediction")
+
+  if (!is.null(split_date)) {
+    p <- p +
+      geom_vline(xintercept = split_date, linetype = "dashed") +
+      annotate("text", x = split_date, y = 10.5, label = "Fit/Pred Split")
   }
 
-  df_fit <- gp$fit
-  df_pred <- gp$pred
+  p
+}
 
-  output$pred_plot <- renderPlot(plot_posterior_mean(df_pred))
-  output$fit_plot <- renderPlot(plot_posterior_mean(df_fit))
+plot_rsq <- function(fit_metrics, pred_metrics) {
+  ggplot(NULL, aes(x = fit_metrics$r_sq, fill = "Fit")) +
+    geom_histogram() +
+    geom_histogram(aes(x = pred_metrics$r_sq, fill = "Pred")) +
+    ggtitle("R^2")
+}
+
+plot_gp <- function(input, output, gp) {
+  df <- rbind(gp$fit, gp$pred)
+  split_date <- tail(gp$fit, n = 1)$date
+
+  output$gp_plot <- renderPlot(plot_posterior_mean(df, split_date))
 }
 
 plot_ar_p <- function(input, output, ar_p) {
-  NULL
-}
-
-plot_arma <- function(input, output, gp) {
-  NULL
+  df <- rbind(ar_p$df_fit, ar_p$df_pred)
+  split_date <- tail(ar_p$df_fit, n = 1)$date
+  output$ar_p_plot <- renderPlot(plot_posterior_mean(df, split_date))
+  output$ar_p_rsq <- renderPlot(plot_rsq(ar_p$eval_fit, ar_p$eval_pred))
 }
 
 run_shiny <- function(args) {
   gp <- readRDS(file.path(args$input_path, "gp.rds"))
   ar_p <- readRDS(file.path(args$input_path, "ar_p.rds"))
-  arma <- readRDS(file.path(args$input_path, "arma.rds"))
 
   ui <- page_fillable(
     headerPanel("Air Quality"),
@@ -44,20 +56,14 @@ run_shiny <- function(args) {
       nav_panel(
         "GP",
         mainPanel(
-          plotOutput("fit_plot"),
-          plotOutput("pred_plot"),
+          plotOutput("gp_plot")
         )
       ),
       nav_panel(
         "AR(p)",
         mainPanel(
-          plotOutput("ar_p_plot")
-        )
-      ),
-      nav_panel(
-        "ARMA",
-        mainPanel(
-          plotOutput("arma_plot")
+          plotOutput("ar_p_plot"),
+          plotOutput("ar_p_rsq")
         )
       )
     )
@@ -66,7 +72,6 @@ run_shiny <- function(args) {
   server <- function(input, output) {
     plot_gp(input, output, gp)
     plot_ar_p(input, output, ar_p)
-    plot_arma(input, output, arma)
   }
 
   shinyApp(ui = ui, server = server)

@@ -2,90 +2,76 @@ library(optparse)
 library(shiny)
 library(bslib)
 library(ggplot2)
-library(patchwork)
-library(tsgarch)
 
-plot_raw <- function(df) {
-  plot_ts <- function(x, y, title) {
-    ggplot(df, aes_string(x = x, y = y)) +
-      geom_line() +
-      ggtitle(title)
-  }
-
-  p1 <- plot_ts(
-    "date",
-    "temperature",
-    "Temperature"
-  )
-
-  p2 <- plot_ts(
-    "date",
-    "pressure",
-    "Pressure"
-  )
-
-  p3 <- plot_ts(
-    "date",
-    "humidity",
-    "Humidity"
-  )
-
-  p1 + p2 + p3
-}
-
-plot_posterior_mean <- function(df) {
-  ggplot(df, aes(x = date)) +
-    geom_line(aes(y = mu_f, color = "Posterior Mean")) +
+plot_posterior_mean <- function(df, split_date = NULL) {
+  p <- ggplot(df, aes(x = date)) +
+    geom_line(aes(y = pm2.5_alt, color = "True PM2.5")) +
+    geom_line(aes(y = mu, color = "Posterior Mean PM2.5")) +
     geom_ribbon(
       aes(
-        ymin = mu_f - 2 * sqrt(var_f),
-        ymax = mu_f + 2 * sqrt(var_f)
+        ymin = mu - 2 * sqrt(sigma),
+        ymax = mu + 2 * sqrt(sigma)
       ),
-      alpha = 0.1
+      alpha = 0.25
     ) +
-    geom_line(aes(y = pm2.5_alt, color = "True PM2.5")) +
     ggtitle("PM2.5 Prediction")
+
+  if (!is.null(split_date)) {
+    p <- p +
+      geom_vline(xintercept = split_date, linetype = "dashed") +
+      annotate("text", x = split_date, y = 10.5, label = "Fit/Pred Split")
+  }
+
+  p
+}
+
+plot_rsq <- function(fit_metrics, pred_metrics) {
+  ggplot(NULL, aes(x = fit_metrics$r_sq, fill = "Fit")) +
+    geom_histogram() +
+    geom_histogram(aes(x = pred_metrics$r_sq, fill = "Pred")) +
+    ggtitle("R^2")
+}
+
+plot_gp <- function(input, output, gp) {
+  df <- rbind(gp$fit, gp$pred)
+  split_date <- tail(gp$fit, n = 1)$date
+
+  output$gp_plot <- renderPlot(plot_posterior_mean(df, split_date))
+}
+
+plot_ar_p <- function(input, output, ar_p) {
+  df <- rbind(ar_p$df_fit, ar_p$df_pred)
+  split_date <- tail(ar_p$df_fit, n = 1)$date
+  output$ar_p_plot <- renderPlot(plot_posterior_mean(df, split_date))
+  output$ar_p_rsq <- renderPlot(plot_rsq(ar_p$eval_fit, ar_p$eval_pred))
 }
 
 run_shiny <- function(args) {
-  output <- readRDS(file.path(args$input_path, "output.rds"))
-  df_pred <- output$pred
-  df_fit <- output$fit
-
-  garch <- readRDS(file.path(args$input_path, "garch.rds"))
+  gp <- readRDS(file.path(args$input_path, "gp.rds"))
+  ar_p <- readRDS(file.path(args$input_path, "ar_p.rds"))
 
   ui <- page_fillable(
     headerPanel("Air Quality"),
     navset_card_tab(
       nav_panel(
-        "Raw Data",
-        mainPanel(
-          plotOutput("raw_plot"),
-        )
-      ),
-      nav_panel(
         "GP",
         mainPanel(
-          plotOutput("fit_plot"),
-          plotOutput("pred_plot"),
+          plotOutput("gp_plot")
         )
       ),
       nav_panel(
-        "GARCH",
+        "AR(p)",
         mainPanel(
-          plotOutput("garch_plot"),
-          tableOutput("garch_table")
+          plotOutput("ar_p_plot"),
+          plotOutput("ar_p_rsq")
         )
       )
     )
   )
 
   server <- function(input, output) {
-    output$raw_plot <- renderPlot(plot_raw(df_pred))
-    output$pred_plot <- renderPlot(plot_posterior_mean(df_pred))
-    output$fit_plot <- renderPlot(plot_posterior_mean(df_fit))
-    output$garch_plot <- renderPlot(plot(garch))
-    output$garch_table <- renderTable(as_flextable(summary(garch)))
+    plot_gp(input, output, gp)
+    plot_ar_p(input, output, ar_p)
   }
 
   shinyApp(ui = ui, server = server)

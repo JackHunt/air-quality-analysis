@@ -6,7 +6,8 @@ install.packages(
     "httr2",
     "optparse",
     "shiny",
-    "yaml"
+    "yaml",
+    "GGally"
   ),
   repos = "https://www.stats.bris.ac.uk/R/"
 )

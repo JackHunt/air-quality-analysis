@@ -3,7 +3,10 @@ library(dplyr)
 library(gplite)
 library(optparse)
 
-load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
+load_data <- function(path,
+                      sensor_id,
+                      prediction_proportion = -1.0,
+                      drop_proportion = 0.0) {
   df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
     select(
       time_stamp,
@@ -25,6 +28,10 @@ load_data <- function(path, sensor_id, prediction_proportion, drop_proportion) {
     n <- nrow(df)
     n_drop <- floor(n * drop_proportion)
     df <- df %>% slice(n_drop : n)
+  }
+
+  if (prediction_proportion <= 0) {
+    return(df)
   }
 
   n <- nrow(df)
@@ -51,8 +58,8 @@ fit_gp <- function(df_fit, df_pred) {
     gp,
     df_fit$time_stamp,
     df_fit$log_pm2.5_alt,
-    max_iter = 5000,
-    restarts = 5
+    max_iter = 5000, # TODO: put in a config file
+    restarts = 5 # TODO: put in a config file
   )
 
   get_eval_df <- function(df) {
@@ -169,12 +176,13 @@ analyse_sensor <- function(input_path,
     prediction_proportion,
     drop_proportion
   )
+  saveRDS(data, file.path(sensor_out_path, "input_data.rds"))
 
   gp <- fit_gp(data$fit, data$pred)
   saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
 
-  p <- 12
-  n <- 10
+  p <- 12 # TODO: put in a config file
+  n <- 10 # TODO: put in a config file
   ar_p <- fit_ar_p(data$fit, data$pred, p, n, stan_fit_args)
   saveRDS(ar_p$res, file.path(sensor_out_path, "ar_p.rds"))
   ar_p$model_fit$save_object(file.path(sensor_out_path, "ar_p_stan.rds"))
@@ -231,7 +239,7 @@ if (!interactive()) {
     sensor_ids <- c(args$sensor_id)
   }
 
-  stan_fit_args <- list(
+  stan_fit_args <- list( # TODO: put in a config file
     n_iter = 2000,
     n_chains = 4,
     seed = 7573

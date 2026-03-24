@@ -2,6 +2,7 @@ library(optparse)
 library(shiny)
 library(bslib)
 library(ggplot2)
+library(GGally)
 
 plot_posterior_mean <- function(df, split_date = NULL) {
   p <- ggplot(df, aes(x = date)) +
@@ -19,7 +20,7 @@ plot_posterior_mean <- function(df, split_date = NULL) {
   if (!is.null(split_date)) {
     p <- p +
       geom_vline(xintercept = split_date, linetype = "dashed") +
-      annotate("text", x = split_date, y = 10.5, label = "Fit/Pred Split")
+      annotate("text", x = split_date, y = 10.5, label = "OOS")
   }
 
   p
@@ -46,13 +47,67 @@ plot_ar_p <- function(input, output, ar_p) {
   output$ar_p_rsq <- renderPlot(plot_rsq(ar_p$eval_fit, ar_p$eval_pred))
 }
 
+plot_raw <- function(input, output, raw) {
+  plot_ts <- function(df, var) {
+    ggplot(df, aes(x = date, y = .data[[var]])) +
+      geom_line() +
+      ggtitle(paste("Raw", var))
+  }
+
+  df <- rbind(raw$fit, raw$pred)
+
+  output$raw_pm2.5 <- renderPlot(plot_ts(df, "pm2.5_alt"))
+  output$raw_temperature <- renderPlot(plot_ts(df, "temperature"))
+  output$raw_pressure <- renderPlot(plot_ts(df, "pressure"))
+  output$raw_humidity <- renderPlot(plot_ts(df, "humidity"))
+}
+
+eda <- function(input, output, raw) {
+  plot_pairs <- function(df) {
+    ggpairs(
+      df,
+      columns = c(
+        "pm2.5_alt",
+        "temperature",
+        "pressure",
+        "humidity"
+      ),
+      lower = list(
+        continuous = "smooth",
+        combo = "facetdensity",
+        mapping = aes(color = date)
+      )
+    )
+  }
+
+  df <- rbind(raw$fit, raw$pred)
+
+  output$eda_pairs_plot <- renderPlot(plot_pairs(df))
+}
+
 run_shiny <- function(args) {
+  raw_data <- readRDS(file.path(args$input_path, "input_data.rds"))
   gp <- readRDS(file.path(args$input_path, "gp.rds"))
   ar_p <- readRDS(file.path(args$input_path, "ar_p.rds"))
 
   ui <- page_fillable(
     headerPanel("Air Quality"),
     navset_card_tab(
+      nav_panel(
+        "Raw Data",
+        mainPanel(
+          plotOutput("raw_pm2.5"),
+          plotOutput("raw_temperature"),
+          plotOutput("raw_pressure"),
+          plotOutput("raw_humidity")
+        )
+      ),
+      nav_panel(
+        "EDA",
+        mainPanel(
+          plotOutput("eda_pairs_plot")
+        )
+      ),
       nav_panel(
         "GP",
         mainPanel(
@@ -70,6 +125,8 @@ run_shiny <- function(args) {
   )
 
   server <- function(input, output) {
+    plot_raw(input, output, raw_data)
+    eda(input, output, raw_data)
     plot_gp(input, output, gp)
     plot_ar_p(input, output, ar_p)
   }

@@ -83,6 +83,7 @@ eda <- function(input, output, raw) {
   df <- rbind(raw$fit, raw$pred)
 
   output$eda_pairs_plot <- renderPlot(plot_pairs(df))
+  output$eda_pm2.5_acf_plot <- renderPlot(acf(df$log_pm2.5_alt))
 }
 
 run_shiny <- function(args) {
@@ -96,28 +97,38 @@ run_shiny <- function(args) {
       nav_panel(
         "Raw Data",
         mainPanel(
+          h2("PM2.5"),
           plotOutput("raw_pm2.5"),
+          h2("Temperature"),
           plotOutput("raw_temperature"),
+          h2("Pressure"),
           plotOutput("raw_pressure"),
+          h2("Humidity"),
           plotOutput("raw_humidity")
         )
       ),
       nav_panel(
         "EDA",
         mainPanel(
-          plotOutput("eda_pairs_plot")
+          h2("Pairs"),
+          plotOutput("eda_pairs_plot"),
+          h2("Autocorrelation (ACF)"),
+          plotOutput("eda_pm2.5_acf_plot")
         )
       ),
       nav_panel(
         "GP",
         mainPanel(
+          h2("Posterior Mean PM2.5"),
           plotOutput("gp_plot")
         )
       ),
       nav_panel(
         "AR(p)",
         mainPanel(
+          h2("Posterior Mean PM2.5"),
           plotOutput("ar_p_plot"),
+          h2("R^2"),
           plotOutput("ar_p_rsq")
         )
       )

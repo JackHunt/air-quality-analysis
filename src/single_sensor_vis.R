@@ -83,7 +83,9 @@ eda <- function(input, output, raw) {
   df <- rbind(raw$fit, raw$pred)
 
   output$eda_pairs_plot <- renderPlot(plot_pairs(df))
-  output$eda_pm2.5_acf_plot <- renderPlot(acf(df$log_pm2.5_alt))
+  output$eda_pm2.5_acf_plot <- renderPlot(acf(df$pm2.5_alt))
+  output$eda_pm2.5_pacf_plot <- renderPlot(pacf(df$pm2.5_alt))
+  output$eda_pm2.5_periodogram <- renderPlot(spectrum(df$pm2.5_alt, span = 24))
 }
 
 run_shiny <- function(args) {
@@ -112,8 +114,11 @@ run_shiny <- function(args) {
         mainPanel(
           h2("Pairs"),
           plotOutput("eda_pairs_plot"),
-          h2("Autocorrelation (ACF)"),
-          plotOutput("eda_pm2.5_acf_plot")
+          h2("Autocorrelation (ACF and PACF)"),
+          plotOutput("eda_pm2.5_acf_plot"),
+          plotOutput("eda_pm2.5_pacf_plot"),
+          h2("PM2.5 Periodogram"),
+          plotOutput("eda_pm2.5_periodogram")
         )
       ),
       nav_panel(

@@ -11,7 +11,7 @@ data {
 parameters {
   real alpha;
   array[p] real beta;
-  real<lower=0.001> sigma;
+  real<lower=0.01> sigma;
 }
 
 model {

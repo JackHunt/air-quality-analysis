@@ -1,13 +1,14 @@
 install.packages(
   c(
+    "GGally",
     "dplyr",
     "ggplot2",
     "gplite",
     "httr2",
     "optparse",
     "shiny",
-    "yaml",
-    "GGally"
+    "tseries",
+    "yaml"
   ),
   repos = "https://www.stats.bris.ac.uk/R/"
 )

@@ -2,6 +2,7 @@ library(cmdstanr)
 library(dplyr)
 library(gplite)
 library(optparse)
+library(tseries)
 
 load_data <- function(path,
                       sensor_id,
@@ -161,6 +162,19 @@ fit_ar_p <- function(df_fit, df_pred, p, n, fit_args) {
   )
 }
 
+do_stationarity_tests <- function(df) {
+  do_tests <- function(x) {
+    list(
+      adf = adf.test(x),
+      kpss = kpss.test(x)
+    )
+  }
+
+  list(
+    pm2.5_alt = do_tests(df$pm2.5_alt)
+  )
+}
+
 analyse_sensor <- function(input_path,
                            sensor_id,
                            output_path,
@@ -170,6 +184,7 @@ analyse_sensor <- function(input_path,
   sensor_out_path <- file.path(output_path, sensor_id)
   dir.create(sensor_out_path)
 
+  # Load data.
   data <- load_data(
     input_path,
     sensor_id,
@@ -178,9 +193,17 @@ analyse_sensor <- function(input_path,
   )
   saveRDS(data, file.path(sensor_out_path, "input_data.rds"))
 
+  # Do hypothesis tests.
+  tests <- do_stationarity_tests(
+    rbind(data$fit, data$pred)
+  )
+  saveRDS(tests, file.path(sensor_out_path, "tests.rds"))
+
+  # Fit GP.
   gp <- fit_gp(data$fit, data$pred)
   saveRDS(gp, file.path(sensor_out_path, "gp.rds"))
 
+  # Fit AR(p) model - will not work for longer time periods due to seasonal nonstationarity.
   p <- 12 # TODO: put in a config file
   n <- 10 # TODO: put in a config file
   ar_p <- fit_ar_p(data$fit, data$pred, p, n, stan_fit_args)

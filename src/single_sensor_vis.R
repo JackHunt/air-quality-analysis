@@ -47,7 +47,7 @@ plot_ar_p <- function(input, output, ar_p) {
   output$ar_p_rsq <- renderPlot(plot_rsq(ar_p$eval_fit, ar_p$eval_pred))
 }
 
-plot_raw <- function(input, output, raw) {
+plot_raw <- function(input, output, raw, tests) {
   plot_ts <- function(df, var) {
     ggplot(df, aes(x = date, y = .data[[var]])) +
       geom_line() +
@@ -60,6 +60,9 @@ plot_raw <- function(input, output, raw) {
   output$raw_temperature <- renderPlot(plot_ts(df, "temperature"))
   output$raw_pressure <- renderPlot(plot_ts(df, "pressure"))
   output$raw_humidity <- renderPlot(plot_ts(df, "humidity"))
+
+  #output$adf <- renderText(tests$pm2.5_alt$adf)
+  #output$kpss <- renderText(tests$pm2.5_alt$kpss)
 }
 
 eda <- function(input, output, raw) {
@@ -90,6 +93,7 @@ eda <- function(input, output, raw) {
 
 run_shiny <- function(args) {
   raw_data <- readRDS(file.path(args$input_path, "input_data.rds"))
+  hyp_tests <- readRDS(file.path(args$input_path, "tests.rds"))
   gp <- readRDS(file.path(args$input_path, "gp.rds"))
   ar_p <- readRDS(file.path(args$input_path, "ar_p.rds"))
 
@@ -101,6 +105,9 @@ run_shiny <- function(args) {
         mainPanel(
           h2("PM2.5"),
           plotOutput("raw_pm2.5"),
+          h3("Stationarity Tests"),
+          textOutput("adf"),
+          textOutput("kpss"),
           h2("Temperature"),
           plotOutput("raw_temperature"),
           h2("Pressure"),
@@ -141,7 +148,7 @@ run_shiny <- function(args) {
   )
 
   server <- function(input, output) {
-    plot_raw(input, output, raw_data)
+    plot_raw(input, output, raw_data, hyp_tests)
     eda(input, output, raw_data)
     plot_gp(input, output, gp)
     plot_ar_p(input, output, ar_p)

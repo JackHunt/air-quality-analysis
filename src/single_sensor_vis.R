@@ -10,8 +10,8 @@ plot_posterior_mean <- function(df, split_date = NULL) {
     geom_line(aes(y = mu, color = "Posterior Mean PM2.5")) +
     geom_ribbon(
       aes(
-        ymin = mu - 2 * sqrt(sigma),
-        ymax = mu + 2 * sqrt(sigma)
+        ymin = mu - 2 * sigma,
+        ymax = mu + 2 * sigma
       ),
       alpha = 0.25
     ) +
@@ -61,8 +61,8 @@ plot_raw <- function(input, output, raw, tests) {
   output$raw_pressure <- renderPlot(plot_ts(df, "pressure"))
   output$raw_humidity <- renderPlot(plot_ts(df, "humidity"))
 
-  #output$adf <- renderText(tests$pm2.5_alt$adf)
-  #output$kpss <- renderText(tests$pm2.5_alt$kpss)
+  output$adf <- renderText(capture.output(tests$pm2.5_alt$adf))
+  output$kpss <- renderText(capture.output(tests$pm2.5_alt$kpss))
 }
 
 eda <- function(input, output, raw) {

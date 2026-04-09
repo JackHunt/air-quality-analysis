@@ -4,6 +4,10 @@ library(bslib)
 library(ggplot2)
 library(GGally)
 
+filter_to_dates <- function(df, min_date, max_date) {
+  subset(df, date %in% min_date:max_date)
+}
+
 plot_posterior_mean <- function(df, split_date = NULL) {
   p <- ggplot(df, aes(x = date)) +
     geom_line(aes(y = pm2.5_alt, color = "True PM2.5")) +
@@ -44,6 +48,7 @@ plot_ar_p <- function(input, output, ar_p) {
   df <- rbind(ar_p$df_fit, ar_p$df_pred)
   split_date <- tail(ar_p$df_fit, n = 1)$date
   output$ar_p_plot <- renderPlot(plot_posterior_mean(df, split_date))
+  output$ar_p_log_plot <- renderPlot(plot_posterior_mean(df, split_date))
   output$ar_p_rsq <- renderPlot(plot_rsq(ar_p$eval_fit, ar_p$eval_pred))
 }
 
@@ -55,6 +60,9 @@ plot_raw <- function(input, output, raw, tests) {
   }
 
   df <- rbind(raw$fit, raw$pred)
+  ## reactive({
+  ##   filter_to_dates(df, )
+  ## })
 
   output$raw_pm2.5 <- renderPlot(plot_ts(df, "pm2.5_alt"))
   output$raw_temperature <- renderPlot(plot_ts(df, "temperature"))
@@ -97,8 +105,19 @@ run_shiny <- function(args) {
   gp <- readRDS(file.path(args$input_path, "gp.rds"))
   ar_p <- readRDS(file.path(args$input_path, "ar_p.rds"))
 
+  min_date <- head(raw_data$fit$date, n = 1)
+  max_date <- tail(raw_data$pred$date, n = 1)
+
   ui <- page_fillable(
     headerPanel("Air Quality"),
+    dateRangeInput(
+      "date_range",
+      "Date Range:",
+      start = min_date,
+      end = max_date,
+      min = min_date,
+      max = max_date
+    ),
     navset_card_tab(
       nav_panel(
         "Raw Data",
@@ -140,6 +159,7 @@ run_shiny <- function(args) {
         mainPanel(
           h2("Posterior Mean PM2.5"),
           plotOutput("ar_p_plot"),
+          #plotOutput("ar_p_log_plot"),
           h2("R^2"),
           plotOutput("ar_p_rsq")
         )

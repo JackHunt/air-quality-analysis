@@ -5,6 +5,9 @@ Air quality analysis.
 Then install packages; in an R session run
 ```R
 source("install_packages.R")
+
+library(cmdstanr)
+install_cmdstan()
 ```
 
 ## Example Run

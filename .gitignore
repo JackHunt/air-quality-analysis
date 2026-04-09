@@ -53,3 +53,4 @@ keys.yaml
 fit.rds
 Rplots.pdf
 src/ar_p
+*.exe

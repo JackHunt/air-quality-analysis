@@ -3,7 +3,7 @@ library(httr2)
 library(optparse)
 library(yaml)
 
-do_get <- function(id, fields, time_avg, api_key) {
+do_get <- function(id, fields, time_avg, api_key, existing_df = NULL) {
   fields_str <- paste(unlist(fields), collapse = ",")
 
   url <- paste0(
@@ -12,9 +12,19 @@ do_get <- function(id, fields, time_avg, api_key) {
     "/history/csv"
   )
 
+  start_ts <- NULL
+  if (!is.null(existing_df)) {
+    start_ts <- tail(existing_df, n = 1)$time_stamp
+  }
+
   res <- request(url) |>
     req_url_query(average = time_avg) |>
     req_url_query(fields = fields_str) |>
+    (\(x)
+      if (!is.null(start_ts))
+        req_url_query(start_timestamp = start_ts)
+      else .
+    )() |>
     req_headers(`X-API-Key` = api_key) |>
     req_perform(verbosity = 3) |>
     resp_body_string()
@@ -49,9 +59,23 @@ retrieve_data <- function(config_path, output_path, api_key) {
   config <- read_yaml(config_path)
 
   for (sensor in config$sensors) {
+    output_fname <- paste0(output_path, "/", sensor$id, ".rds")
+
+    existing_df <- NULL
+    if (file.exists(output_fname)) {
+      existing_df <- readRDS(output_fname)
+      warning(paste(output_fname, "already exists and will be updated."))
+    }
+
     metadata <- do_get_metadata(sensor$id, api_key)
 
-    res <- do_get(sensor$id, config$fields, config$time_average, api_key) %>%
+    res <- do_get(
+      sensor$id,
+      config$fields,
+      config$time_average,
+      api_key,
+      existing_df = existing_df
+    ) %>%
       mutate(
         sensor_name = metadata$sensor$name,
         is_indoor = metadata$sensor$location_type,
@@ -59,7 +83,12 @@ retrieve_data <- function(config_path, output_path, api_key) {
         longitude = metadata$sensor$longitude
       )
 
-    saveRDS(res, paste0(output_path, "/", sensor$id, ".rds"))
+    if (!is.null(existing_df)) {
+      res <- bind_rows(existing_df, res) %>%
+        distinct()
+    }
+
+    saveRDS(res, output_fname)
   }
 }
 

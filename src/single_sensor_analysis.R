@@ -1,48 +1,10 @@
+source("src/data_load.R")
+
 library(cmdstanr)
 library(dplyr)
 library(gplite)
 library(optparse)
 library(tseries)
-
-load_data <- function(path,
-                      sensor_id,
-                      prediction_proportion = -1.0,
-                      drop_proportion = 0.0) {
-  df <- readRDS(paste0(path, "/", sensor_id, ".rds")) %>%
-    select(
-      time_stamp,
-      temperature,
-      pressure,
-      humidity,
-      pm2.5_alt
-    ) %>%
-    arrange(time_stamp) %>%
-    mutate(
-      original_time_stamp = time_stamp,
-      date = as.POSIXct(time_stamp, origin = "1970-01-01", tz = "GMT"),
-      log_pm2.5_alt = log(pm2.5_alt)
-    ) %>%
-    mutate(time_stamp = (time_stamp - min(time_stamp)) / 1000) %>%
-    distinct()
-
-  if (drop_proportion > 0.0) {
-    n <- nrow(df)
-    n_drop <- floor(n * drop_proportion)
-    df <- df %>% slice(n_drop : n)
-  }
-
-  if (prediction_proportion <= 0) {
-    return(df)
-  }
-
-  n <- nrow(df)
-  n_fit <- floor(n * (1.0 - prediction_proportion))
-
-  list(
-    fit = df %>% slice(1 : n_fit),
-    pred = df %>% slice(n_fit + 1 : n)
-  )
-}
 
 fit_gp <- function(df_fit, df_pred) {
   kernels <- list(
@@ -185,7 +147,7 @@ analyse_sensor <- function(input_path,
   dir.create(sensor_out_path)
 
   # Load data.
-  data <- load_data(
+  data <- load_purple_air(
     input_path,
     sensor_id,
     prediction_proportion,
@@ -252,12 +214,7 @@ if (!interactive()) {
   dir.create(args$output_path)
 
   if (is.na(args$sensor_id)) {
-    sensor_ids <- lapply(
-      list.files(pattern = "\\.rds$", ignore.case = TRUE),
-      function(fname) {
-        sub("\\.rds$", "", fname)
-      }
-    )
+    sensor_ids <- get_sensor_ids(args$input_path)
   } else {
     sensor_ids <- c(args$sensor_id)
   }

@@ -12,7 +12,7 @@ do_get <- function(id, fields, time_avg, api_key, existing_df = NULL) {
     "/history/csv"
   )
 
-  start_ts <- NULL
+  start_ts <- 1 # TODO: Check this will actually work.
   if (!is.null(existing_df)) {
     start_ts <- tail(existing_df, n = 1)$time_stamp
   }
@@ -20,16 +20,13 @@ do_get <- function(id, fields, time_avg, api_key, existing_df = NULL) {
   res <- request(url) |>
     req_url_query(average = time_avg) |>
     req_url_query(fields = fields_str) |>
-    (\(x)
-      if (!is.null(start_ts))
-        req_url_query(start_timestamp = start_ts)
-      else .
-    )() |>
+    req_url_query(start_timestamp = start_ts) |>
     req_headers(`X-API-Key` = api_key) |>
     req_perform(verbosity = 3) |>
     resp_body_string()
 
-  read.csv(text = res)
+  read.csv(text = res) %>%
+    mutate(across(everything(), as.numeric))
 }
 
 do_get_metadata <- function(id, api_key) {

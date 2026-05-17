@@ -1,0 +1,7 @@
+frequency: hourly
+start_date: null
+end_date: null
+sites:
+  - name: central_chippenham
+    latitude: 0
+    longitude: 0

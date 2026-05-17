@@ -52,9 +52,7 @@ do_get_metadata <- function(id, api_key) {
     resp_body_json()
 }
 
-retrieve_data <- function(config_path, output_path, api_key) {
-  config <- read_yaml(config_path)
-
+retrieve_data <- function(config, output_path, api_key) {
   for (sensor in config$sensors) {
     output_fname <- paste0(output_path, "/", sensor$id, ".rds")
 
@@ -111,5 +109,11 @@ if (!interactive()) {
 
   keys <- read_yaml("./keys.yaml")
 
-  retrieve_data(args$config_path, args$output_path, keys$purple_air)
+  config <- read_yaml(config_path)
+
+  retrieve_data(
+    config,
+    args$output_path,
+    keys$purple_air
+  )
 }

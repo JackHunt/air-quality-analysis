@@ -1,0 +1,6 @@
+start_date: "2025-08-01"
+end_date: "2026-05-01"
+sites:
+  - name: chippenham
+    latitude: 51.458762
+    longitude: -2.115903

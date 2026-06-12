@@ -15,3 +15,6 @@ RUN apt-get install -y \
   libproj-dev \
   libsqlite3-dev \
   libabsl-dev
+
+RUN wget https://github.com/quarto-dev/quarto-cli/releases/download/v1.9.38/quarto-1.9.38-linux-amd64.deb && \
+  dpkg -i quarto-1.9.38-linux-amd64.deb

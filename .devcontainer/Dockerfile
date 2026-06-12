@@ -4,8 +4,14 @@ RUN apt-get update && apt-get -y upgrade
 
 RUN apt-get install -y \
   build-essential \
-  libxml2-dev \
   r-base \
   r-base-dev \
+  libxml2-dev \
   libuv1-dev \
-  git-lfs
+  git-lfs \
+  libudunits2-dev \
+  libgdal-dev \
+  libgeos-dev \
+  libproj-dev \
+  libsqlite3-dev \
+  libabsl-dev

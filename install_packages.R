@@ -4,6 +4,7 @@ install.packages(
     "dplyr",
     "ggplot2",
     "gplite",
+    "gstat",
     "httr2",
     "optparse",
     "shiny",

@@ -15,8 +15,7 @@ install.packages(
 
 install.packages(
   c(
-    "cmdstanr",
-    "shinystan"
+    "cmdstanr"
   ),
   repos = c(
     "https://stan-dev.r-universe.dev",

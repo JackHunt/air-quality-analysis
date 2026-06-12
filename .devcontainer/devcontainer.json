@@ -3,6 +3,6 @@
 {
   "name": "Ubuntu",
   "build": {
-    "dockerfile": "Dockerfile"
+    "dockerfile": "../Dockerfile"
   }
 }

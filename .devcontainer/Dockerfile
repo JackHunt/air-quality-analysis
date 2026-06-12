@@ -7,4 +7,5 @@ RUN apt-get install -y \
   libxml2-dev \
   r-base \
   r-base-dev \
-  libuv1-dev
+  libuv1-dev \
+  git-lfs

@@ -32,3 +32,6 @@ RUN R -e "install.packages('tseries'); if (!library(tseries, logical.return=T)) 
 RUN R -e "install.packages('yaml'); if (!library(yaml, logical.return=T)) quit(status=10)"
 
 RUN R -e "install.packages('cmdstanr', repos = c('https://stan-dev.r-universe.dev', getOption('repos'))); if (!library(cmdstanr, logical.return=T)) quit(status=10)"
+RUN R -e "library(cmdstanr); install_cmdstan()"
+
+RUN R -e "install.packages('gplite'); if (!library(gplite, logical.return=T)) quit(status=10)"
